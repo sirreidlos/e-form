@@ -1,3 +1,9 @@
+use std::any::Any;
+
+use bson::serde_helpers::{
+    deserialize_hex_string_from_object_id, serialize_hex_string_as_object_id,
+};
+use chrono::{DateTime, Utc};
 use mongodb::bson::doc;
 use mongodb::{Client, Database};
 use regex::Regex;
@@ -7,10 +13,12 @@ use rocket::{
     serde::json::{Json, Value},
     State,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha512};
 use sqlx::MySqlPool;
+
+use crate::model::User;
 
 lazy_static! {
     static ref EMAIL_REGEX: Regex = Regex::new(
@@ -19,7 +27,7 @@ lazy_static! {
     .unwrap();
 }
 
-#[derive(FromForm, Deserialize, Debug)]
+#[derive(FromForm, Deserialize, Serialize, Debug)]
 pub struct RegisterData {
     username: String,
     email: String,
@@ -30,14 +38,6 @@ pub struct RegisterData {
 pub struct LoginData {
     email: String,
     password: String,
-}
-
-struct User {
-    id: String,
-    email: String,
-    username: String,
-    password: String,
-    created_at: sqlx::types::time::OffsetDateTime,
 }
 
 fn hash_password(password: &String) -> String {
@@ -59,14 +59,17 @@ pub async fn register(data: Json<RegisterData>, db: &State<Database>) -> Custom<
         );
     }
 
+    println!("{:?}", data.email.type_id());
+
     let db = db.inner().clone();
-    match db
+
+    let _find: Option<User> = match db
         .collection("users")
         .find_one(doc! {"email": &data.email}, None)
         .await
     {
         Ok(res) => {
-            if res != None {
+            if res.is_some() {
                 return Custom(
                     Status::Conflict,
                     json!( {
@@ -74,6 +77,8 @@ pub async fn register(data: Json<RegisterData>, db: &State<Database>) -> Custom<
                     }),
                 );
             }
+
+            res
         }
         Err(e) => {
             println!("{e}");
@@ -84,40 +89,20 @@ pub async fn register(data: Json<RegisterData>, db: &State<Database>) -> Custom<
                 }),
             );
         }
-    }
+    };
 
-    // match sqlx::query("SELECT * FROM `users` WHERE `email` = ?")
-    //     .bind(&data.email)
-    //     .fetch_one(db.inner())
-    //     .await
-    // {
-    //     Ok(_) => {
-    //         return Custom(
-    //             Status::Conflict,
-    //             json!( {
-    //                 "message": "An existing account has been made using this email.",
-    //             }),
-    //         )
-    //     }
-    //     Err(e) => {
-    //         if !matches!(e, sqlx::Error::RowNotFound) {
-    //             println!("{e}");
-    //             return Custom(
-    //                 Status::InternalServerError,
-    //                 json!( {
-    //                     "message": "An error has occurred.",
-    //                 }),
-    //             );
-    //         }
-    //     }
-    // }
+    let password_hash = hash_password(&data.password);
 
-    let hash = hash_password(&data.password);
-
-    let id = uuid::Uuid::new_v4().to_string();
+    let new_user = User {
+        _id: mongodb::bson::oid::ObjectId::new().to_string(),
+        email: data.email.clone(),
+        username: data.username.clone(),
+        password: password_hash,
+        created_at: Utc::now(),
+    };
 
     use crate::auth::generate_jwt;
-    let token = match generate_jwt(&id) {
+    let token = match generate_jwt(&new_user._id) {
         Ok(token) => token,
         Err(e) => {
             println!("{e}");
@@ -130,14 +115,7 @@ pub async fn register(data: Json<RegisterData>, db: &State<Database>) -> Custom<
         }
     };
 
-    match sqlx::query("INSERT INTO `users` (id, email, username, password) VALUES (?, ?, ?, ?)")
-        .bind(id)
-        .bind(&data.email)
-        .bind(&data.username)
-        .bind(hash)
-        .execute(db.inner())
-        .await
-    {
+    match db.collection("users").insert_one(new_user, None).await {
         Ok(_) => Custom(
             Status::Created,
             json!({
@@ -159,7 +137,7 @@ pub async fn register(data: Json<RegisterData>, db: &State<Database>) -> Custom<
 }
 
 #[post("/login", format = "json", data = "<data>")]
-pub async fn login(data: Json<LoginData>, db: &State<MySqlPool>) -> Custom<Value> {
+pub async fn login(data: Json<LoginData>, db: &State<Database>) -> Custom<Value> {
     if !validate_email(&data.email) {
         return Custom(
             Status::UnprocessableEntity,
@@ -169,24 +147,35 @@ pub async fn login(data: Json<LoginData>, db: &State<MySqlPool>) -> Custom<Value
         );
     }
 
-    // let query = ;
-    let user = match sqlx::query_as!(User, "SELECT * FROM `users` WHERE email = ?", &data.email)
-        .fetch_one(db.inner())
+    let user: User = match db
+        .collection("users")
+        .find_one(doc! {"email": &data.email}, None)
         .await
     {
-        Ok(data) => data,
+        Ok(res) => {
+            if res.is_none() {
+                return Custom(
+                    Status::NotFound,
+                    json!( {
+                        "message": "Account not found.",
+                    }),
+                );
+            }
+
+            res.unwrap()
+        }
         Err(e) => {
             println!("{e}");
             return Custom(
-                Status::NotFound,
-                json!({
-                    "message": "Account not found.",
+                Status::InternalServerError,
+                json!( {
+                    "message": "An error has occurred.",
                 }),
             );
         }
     };
 
-    // let user = user.unwrap();
+    // // let user = user.unwrap();
 
     let hash = hash_password(&data.password);
     if hash != user.password {
@@ -199,7 +188,7 @@ pub async fn login(data: Json<LoginData>, db: &State<MySqlPool>) -> Custom<Value
     }
 
     use crate::auth::generate_jwt;
-    let session_token: String = match generate_jwt(&user.id) {
+    let session_token: String = match generate_jwt(&user._id) {
         Ok(token) => token,
         Err(e) => {
             println!("{e}");
@@ -219,4 +208,198 @@ pub async fn login(data: Json<LoginData>, db: &State<MySqlPool>) -> Custom<Value
             "token": session_token,
         }),
     )
+}
+
+#[cfg(test)]
+mod test {
+    use bson::Document;
+    use mongodb::bson::doc;
+    use mongodb::Client as mdbClient;
+    use rocket::http::{ContentType, Status};
+    use rocket::local::asynchronous::Client;
+    use serde_json::json;
+
+    use crate::rocket;
+
+    async fn cleanup(email: &str) -> Result<(), mongodb::error::Error> {
+        let mongo_db = match mdbClient::with_uri_str("mongodb://localhost:27017/e-form").await {
+            Ok(client) => client.database("e-form"),
+            Err(e) => panic!("{e}"),
+        };
+
+        let _result: mongodb::results::DeleteResult = mongo_db
+            .collection::<Document>("users")
+            .delete_many(doc! {"email": email}, None)
+            .await?;
+
+        Ok(())
+    }
+
+    #[async_test]
+    async fn register_user() {
+        let client = Client::tracked(rocket().await)
+            .await
+            .expect("valid rocket instance");
+        let response = client
+            .post(uri!(crate::routes::user::register))
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "test@example.com",
+                    "username": "milize",
+                    "password": "hello"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        // let response = response.await;
+        assert_eq!(response.status(), Status::Created);
+        println!("{:?}", response.body());
+        assert!(cleanup("test@example.com").await.is_ok());
+    }
+
+    #[async_test]
+    async fn register_malformed_email() {
+        let client = Client::tracked(rocket().await)
+            .await
+            .expect("valid rocket instance");
+
+        let mut responses = vec![];
+
+        let response = client
+            .post(uri!(crate::routes::user::register))
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "example.com",
+                    "username": "milize",
+                    "password": "hello"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+        responses.push(response.status());
+
+        let response = client
+            .post(uri!(crate::routes::user::register))
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "test@123",
+                    "username": "milize",
+                    "password": "hello"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+        responses.push(response.status());
+
+        let response = client
+            .post(uri!(crate::routes::user::register))
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "yoru @ ni . kakeru",
+                    "username": "milize",
+                    "password": "hello"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+        responses.push(response.status());
+
+        for response in responses {
+            assert_eq!(response, Status::UnprocessableEntity);
+            // println!("{response}");
+        }
+    }
+
+    #[async_test]
+    async fn register_duplicate_email() {
+        let client = Client::tracked(rocket().await)
+            .await
+            .expect("valid rocket instance");
+        let response = client
+            .post(uri!(crate::routes::user::register))
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "test@example.com",
+                    "username": "milize",
+                    "password": "hello"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+        println!("{:?}", response.status());
+        assert_eq!(response.status(), Status::Created);
+
+        let response = client
+            .post(uri!(crate::routes::user::register))
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "test@example.com",
+                    "username": "milize",
+                    "password": "hello"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        // let response = response.await;
+
+        println!("{:?}", response.status());
+        assert_eq!(response.status(), Status::Conflict);
+
+        assert!(cleanup("test@example.com").await.is_ok());
+    }
+
+    #[async_test]
+    async fn login_user() {
+        let client = Client::tracked(rocket().await)
+            .await
+            .expect("valid rocket instance");
+
+        let register_response = client
+            .post(uri!(crate::routes::user::register))
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "test@example.com",
+                    "username": "milize",
+                    "password": "hello"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(register_response.status(), Status::Created);
+
+        let response = client
+            .post(uri!(crate::routes::user::login))
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "test@example.com",
+                    "username": "milize",
+                    "password": "hello"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        println!("{:?}", response.body());
+        assert_eq!(response.status(), Status::Ok);
+        assert!(cleanup("test@example.com").await.is_ok());
+    }
 }

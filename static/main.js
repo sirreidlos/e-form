@@ -1,7 +1,7 @@
 function main() {
   console.log("nicks-cors-test");
   $.ajax({
-    url: "http://localhost:8000",
+    url: "http://api.dev.test",
     success: function (data) {
       console.log(data);
     },

@@ -7,13 +7,13 @@ use rocket::serde::{Deserialize, Serialize};
 const SECRET: &[u8] = b"secret";
 
 #[derive(Debug)]
-pub struct UserID(pub String);
+pub struct Auth(pub String);
 
 #[async_trait]
-impl<'a> FromRequest<'a> for UserID {
+impl<'a> FromRequest<'a> for Auth {
     type Error = ();
 
-    async fn from_request(request: &'a Request<'_>) -> request::Outcome<UserID, ()> {
+    async fn from_request(request: &'a Request<'_>) -> request::Outcome<Auth, ()> {
         let headers = request.headers();
         let auth = headers.get_one("Authorization");
 
@@ -25,7 +25,7 @@ impl<'a> FromRequest<'a> for UserID {
                     &DecodingKey::from_secret(SECRET),
                     &Validation::default(),
                 ) {
-                    Ok(data) => Outcome::Success(UserID(data.claims.sub)),
+                    Ok(data) => Outcome::Success(Auth(data.claims.sub)),
                     Err(_) => Outcome::Failure((Status::Unauthorized, ())),
                 }
             }

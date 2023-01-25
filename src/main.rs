@@ -5,10 +5,8 @@ extern crate rocket;
 extern crate lazy_static;
 
 mod auth;
+mod model;
 mod routes;
-
-use std::collections::HashMap;
-use std::sync::Mutex;
 
 use mongodb::Database;
 use rocket::fairing::{AdHoc, Fairing, Info, Kind};
@@ -54,7 +52,7 @@ impl Fairing for CORS {
 
 use auth::generate_jwt;
 #[get("/<user_id>")]
-fn test_token(user_id: &str) -> Option<Value> {
+pub fn test_token(user_id: &str) -> Option<Value> {
     // Some(json!({ "token": generate_jwt(user_id) }))
     match generate_jwt(user_id) {
         Ok(token) => Some(json!({ "token": token })),
@@ -62,15 +60,15 @@ fn test_token(user_id: &str) -> Option<Value> {
     }
 }
 
-use auth::UserID;
+use auth::Auth;
 #[get("/attempt")]
-fn attempt(user_id: UserID) -> Option<Value> {
+fn attempt(user_id: Auth) -> Option<Value> {
     Some(json!({ "token": user_id.0 }))
 }
 
 use mongodb::{bson::doc, bson::oid::ObjectId, options::ClientOptions, Client};
 #[launch]
-async fn rocket() -> _ {
+pub async fn rocket() -> _ {
     // let db_url = "mysql://root@localhost/e_form";
     // let pool = match MySqlPool::connect(db_url).await {
     //     Ok(pool) => pool,
