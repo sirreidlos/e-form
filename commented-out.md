@@ -27,3 +27,12 @@ match sqlx::query("SELECT * FROM `users` WHERE `email` = ?")
     }
 }
 ```
+
+```rs
+_or(return Custom(
+                Status::NotFound,
+                json!({
+                    "message": "Form not found."
+                }),
+            ))
+```

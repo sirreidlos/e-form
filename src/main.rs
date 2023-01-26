@@ -19,7 +19,6 @@ use rocket::tokio::sync::broadcast::channel;
 use rocket::Response;
 
 use serde_json::{json, Value};
-use sqlx::MySqlPool;
 
 pub struct CORS;
 
@@ -86,5 +85,9 @@ pub async fn rocket() -> _ {
         .manage::<Database>(mongo_db)
         .mount("/", routes![test_token, attempt])
         .mount("/", routes![routes::user::login, routes::user::register])
+        .mount(
+            "/",
+            routes![routes::form::get_form, routes::form::edit_form],
+        )
         .mount("/", FileServer::from(relative!("static")))
 }

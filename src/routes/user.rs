@@ -16,7 +16,6 @@ use rocket::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha512};
-use sqlx::MySqlPool;
 
 use crate::model::User;
 

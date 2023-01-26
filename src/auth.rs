@@ -43,13 +43,13 @@ struct Claims {
     pub sub: String,
 }
 
+const TWO_HOURS_IN_SECONDS: u64 = 2 * 60 * 60;
+
 pub fn generate_jwt(user_id: &str) -> Result<String, jsonwebtoken::errors::Error> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-
-    let TWO_HOURS_IN_SECONDS = 2 * 60 * 60;
 
     let claims = Claims {
         exp: now + TWO_HOURS_IN_SECONDS,
