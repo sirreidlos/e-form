@@ -1,8 +1,7 @@
 use std::str::FromStr;
 
-use bson::{
-    serde_helpers::{deserialize_hex_string_from_object_id, serialize_hex_string_as_object_id},
-    Document,
+use bson::serde_helpers::{
+    deserialize_hex_string_from_object_id, serialize_hex_string_as_object_id,
 };
 
 use chrono::{DateTime, Utc};
@@ -29,6 +28,7 @@ struct Form {
     pub owner: String,
     pub title: String,
     pub description: String,
+    pub form_state: FormState,
     pub questions: Vec<Question>,
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub created_at: DateTime<Utc>,
@@ -50,6 +50,13 @@ enum QuestionType {
     Dropdown,
     Date,
     Time,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+enum FormState {
+    Private,
+    Public,
+    Anonymous,
 }
 
 #[get("/form/<id>")]
@@ -101,6 +108,7 @@ pub async fn get_form(id: String, user_id: Auth, db: &State<Database>) -> Custom
             "owner": form.owner,
             "title": form.title,
             "description": form.description,
+            "form_state": form.form_state,
             "questions": form.questions,
             "created_at": form.created_at.to_rfc3339(),
         }),

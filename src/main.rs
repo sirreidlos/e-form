@@ -10,13 +10,14 @@ mod routes;
 
 use mongodb::Database;
 use rocket::fairing::{AdHoc, Fairing, Info, Kind};
+use rocket::figment::Figment;
 use rocket::fs::{relative, FileServer};
 
 use rocket::http::{ContentType, Header, Method, Status};
 use rocket::request::Request;
 
 use rocket::tokio::sync::broadcast::channel;
-use rocket::Response;
+use rocket::{Config, Response};
 
 use serde_json::{json, Value};
 
@@ -79,10 +80,13 @@ pub async fn rocket() -> _ {
         Err(e) => panic!("{e}"),
     };
 
+    let config = Config::figment();
+
     rocket::build()
         .attach(CORS)
         // .manage::<MySqlPool>(pool)
         .manage::<Database>(mongo_db)
+        .manage::<Figment>(config)
         .mount("/", routes![test_token, attempt])
         .mount("/", routes![routes::user::login, routes::user::register])
         .mount(
