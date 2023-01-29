@@ -1,3 +1,5 @@
+#![feature(is_some_and)]
+
 #[macro_use]
 extern crate rocket;
 
@@ -5,21 +7,17 @@ extern crate rocket;
 extern crate lazy_static;
 
 mod auth;
-mod model;
 mod routes;
 
+use mongodb::Client;
 use mongodb::Database;
-use rocket::fairing::{AdHoc, Fairing, Info, Kind};
+use rocket::fairing::{Fairing, Info, Kind};
 use rocket::figment::Figment;
 use rocket::fs::{relative, FileServer};
-
 use rocket::http::{ContentType, Header, Method, Status};
 use rocket::request::Request;
-
 use rocket::tokio::sync::broadcast::channel;
 use rocket::{Config, Response};
-
-use serde_json::{json, Value};
 
 pub struct CORS;
 
@@ -50,31 +48,8 @@ impl Fairing for CORS {
     }
 }
 
-use auth::generate_jwt;
-#[get("/<user_id>")]
-pub fn test_token(user_id: &str) -> Option<Value> {
-    // Some(json!({ "token": generate_jwt(user_id) }))
-    match generate_jwt(user_id) {
-        Ok(token) => Some(json!({ "token": token })),
-        Err(_) => None,
-    }
-}
-
-use auth::Auth;
-#[get("/attempt")]
-fn attempt(user_id: Auth) -> Option<Value> {
-    Some(json!({ "token": user_id.0 }))
-}
-
-use mongodb::{bson::doc, bson::oid::ObjectId, options::ClientOptions, Client};
 #[launch]
 pub async fn rocket() -> _ {
-    // let db_url = "mysql://root@localhost/e_form";
-    // let pool = match MySqlPool::connect(db_url).await {
-    //     Ok(pool) => pool,
-    //     Err(error) => panic!("Failed to connect to database: {error}"),
-    // };
-
     let mongo_db = match Client::with_uri_str("mongodb://localhost:27017/e-form").await {
         Ok(client) => client.database("e-form"),
         Err(e) => panic!("{e}"),
@@ -84,14 +59,30 @@ pub async fn rocket() -> _ {
 
     rocket::build()
         .attach(CORS)
-        // .manage::<MySqlPool>(pool)
+        .manage(channel::<routes::response::Response>(1024).0)
         .manage::<Database>(mongo_db)
         .manage::<Figment>(config)
-        .mount("/", routes![test_token, attempt])
         .mount("/", routes![routes::user::login, routes::user::register])
         .mount(
             "/",
-            routes![routes::form::get_form, routes::form::edit_form],
+            routes![
+                routes::form::get_form,
+                routes::form::get_form_as_anon,
+                routes::form::post_form,
+                routes::form::post_form_as_anon,
+                routes::form::put_form,
+                routes::form::put_form_as_anon,
+                routes::form::delete_form,
+                routes::form::delete_form_as_anon,
+            ],
+        )
+        .mount(
+            "/",
+            routes![
+                routes::response::get_response,
+                routes::response::post_response,
+                routes::response::response_stream,
+            ],
         )
         .mount("/", FileServer::from(relative!("static")))
 }
