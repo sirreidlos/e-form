@@ -82,7 +82,9 @@ pub async fn rocket() -> _ {
                 routes::response::get_response,
                 routes::response::post_response,
                 routes::response::response_stream,
+                routes::response::response_stream_as_anon,
             ],
         )
-        .mount("/", FileServer::from(relative!("static")))
+        .mount("/s1", FileServer::from(relative!("static")))
+        .mount("/s2", FileServer::from(relative!("static2")))
 }

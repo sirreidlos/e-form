@@ -100,21 +100,21 @@ fn serialize_responses_to_json(responses: Vec<Response>) -> Vec<Value> {
 #[get("/stream/<id>")]
 pub async fn response_stream(
     id: String,
-    // user_id: Auth,
+    user_id: Auth,
     db: &State<Database>,
     queue: &State<Sender<Response>>,
     mut end: Shutdown,
 ) -> Result<EventStream![], Custom<Value>> {
-    // let form: Form = find_form_by_id(&id, db).await?;
+    let form: Form = find_form_by_id(&id, db).await?;
 
-    // if form.owner != user_id.0 {
-    //     return Err(Custom(
-    //         Status::Forbidden,
-    //         json!({
-    //             "message": "You are not the owner of this form."
-    //         }),
-    //     ));
-    // }
+    if form.owner != user_id.0 {
+        return Err(Custom(
+            Status::Forbidden,
+            json!({
+                "message": "You are not the owner of this form."
+            }),
+        ));
+    }
 
     let mut rx = queue.subscribe();
 
@@ -138,6 +138,14 @@ pub async fn response_stream(
             yield Event::json(&msg);
         }
     })
+}
+
+#[get("/stream/<_>", rank = 2)]
+pub async fn response_stream_as_anon() -> Custom<Value> {
+    Custom(
+        Status::Unauthorized,
+        json!({"message": "You are not logged in."}),
+    )
 }
 
 #[get("/response/<id>")]
@@ -279,12 +287,12 @@ pub async fn post_response(
         created_at: Utc::now(),
     };
 
-    let insert_one_res = match db
+    match db
         .collection("responses")
         .insert_one(res_struct, None)
         .await
     {
-        Ok(response) => response,
+        Ok(_) => (),
         Err(e) => {
             println!("{e}");
             return Custom(
@@ -309,9 +317,12 @@ pub async fn post_response(
             let _res = queue.send(response.unwrap());
             Custom(Status::Ok, json!({"message": "Response sent."}))
         }
-        Err(e) => Custom(
-            Status::InternalServerError,
-            json!({"message": "This error should and will never be called."}),
-        ),
+        Err(e) => {
+            println!("{e}");
+            Custom(
+                Status::InternalServerError,
+                json!({"message": "This error should and will never be called."}),
+            )
+        }
     }
 }
