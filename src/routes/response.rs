@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use bson::{
     serde_helpers::{deserialize_hex_string_from_object_id, serialize_hex_string_as_object_id},
     Document,
@@ -61,7 +59,36 @@ pub struct ResponseData {
     pub answers: Vec<Answer>,
 }
 
-async fn retrieve_responses(
+pub async fn find_response_by_id(
+    id: &str,
+    db: &State<Database>,
+) -> Result<Response, Custom<Value>> {
+    let obj_id = object_id_from_string(id)?;
+    match db
+        .collection("responses")
+        .find_one(doc! {"_id": obj_id}, None)
+        .await
+    {
+        Ok(Some(form)) => Ok(form),
+        Ok(None) => Err(Custom(
+            Status::NotFound,
+            json!({
+                "message": "Response not found."
+            }),
+        )),
+        Err(e) => {
+            println!("{e} in find_response_by_id");
+            Err(Custom(
+                Status::InternalServerError,
+                json!({
+                    "message": "An internal server error has occured."
+                }),
+            ))
+        }
+    }
+}
+
+async fn find_multiple_responses_by_id(
     id: ObjectId,
     db: &State<Database>,
 ) -> mongodb::error::Result<Vec<Response>> {
@@ -168,7 +195,7 @@ pub async fn get_response(id: String, user_id: Auth, db: &State<Database>) -> Cu
 
     let obj_id = object_id_from_string(&form._id).unwrap();
 
-    let responses = match retrieve_responses(obj_id, db).await {
+    let responses = match find_multiple_responses_by_id(obj_id, db).await {
         Ok(res) => res,
         Err(e) => {
             println!("{e} in get response responses");
@@ -207,6 +234,19 @@ pub async fn post_response(
 
         let answer = &data.answers[i];
 
+        if answer.number != question.number {
+            return Custom(
+                Status::UnprocessableEntity,
+                json!({
+                    "message":
+                        format!(
+                            "Answer number {} does not match question number {}",
+                            answer.number, question.number
+                        )
+                }),
+            );
+        }
+
         if question.kind == QuestionType::Checkboxes {
             if let Some(options) = &question.options {
                 if answer.input.is_none() {
@@ -219,7 +259,6 @@ pub async fn post_response(
                 }
 
                 let input: Vec<&str> = answer.input.as_ref().unwrap().split('|').collect();
-
                 for i in input {
                     if !options.contains(&i.to_owned()) {
                         return Custom(
@@ -236,19 +275,7 @@ pub async fn post_response(
                 }
                 // let input: Vec<String> = input.iter().map(|s| s.to_owned()).collect();
             }
-        }
-
-        if answer.number != question.number {
-            return Custom(
-                Status::UnprocessableEntity,
-                json!({
-                    "message":
-                        format!(
-                            "Answer number {} does not match question number {}",
-                            answer.number, question.number
-                        )
-                }),
-            );
+            continue;
         }
 
         if let Some(options) = &question.options {
@@ -322,6 +349,49 @@ pub async fn post_response(
             Custom(
                 Status::InternalServerError,
                 json!({"message": "This error should and will never be called."}),
+            )
+        }
+    }
+}
+
+#[delete("/response/<id>")]
+pub async fn delete_response(id: String, user_id: Auth, db: &State<Database>) -> Custom<Value> {
+    let response: Response = match find_response_by_id(&id, db).await {
+        Ok(response) => response,
+        Err(e) => {
+            return e;
+        }
+    };
+
+    let form: Form = match find_form_by_id(&response.form, db).await {
+        Ok(form) => form,
+        Err(e) => {
+            return e;
+        }
+    };
+
+    if form.owner != user_id.0 {
+        return Custom(
+            Status::Forbidden,
+            json!({
+                "message": "You are not the owner of this form."
+            }),
+        );
+    }
+
+    match db
+        .collection::<Document>("forms")
+        .delete_one(doc! {"_id": response._id}, None)
+        .await
+    {
+        Ok(_) => Custom(Status::Ok, json!({"message": "Response deleted."})),
+        Err(e) => {
+            println!("{e} in delete_response");
+            Custom(
+                Status::InternalServerError,
+                json!({
+                    "message": "An internal server error has occured."
+                }),
             )
         }
     }
