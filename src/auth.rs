@@ -48,7 +48,7 @@ pub struct Claims {
     pub sub: String,
 }
 
-const TWO_HOURS_IN_SECONDS: u64 = 2 * 60 * 60;
+const SEVEN_DAYS_IN_SECONDS: u64 = 168 * 60 * 60;
 
 pub fn decode_jwt(
     token: &str,
@@ -64,7 +64,7 @@ pub fn generate_jwt(user_id: &str) -> Result<String, jsonwebtoken::errors::Error
         .as_secs();
 
     let claims = Claims {
-        exp: now + TWO_HOURS_IN_SECONDS,
+        exp: now + SEVEN_DAYS_IN_SECONDS,
         sub: user_id.to_string(),
     };
 
