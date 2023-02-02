@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use bson::{
     serde_helpers::{deserialize_hex_string_from_object_id, serialize_hex_string_as_object_id},
     Document,
