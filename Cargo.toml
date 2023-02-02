@@ -10,15 +10,10 @@ lazy_static = "1.4.0"
 regex = "1.7.0"
 rocket = { version = "0.5.0-rc.2", features = ["json", "secrets"] }
 sha2 = "0.10"
-uuid = { version = "1.2.2", features = ["v4"] }
-zxcvbn = "2"
-rand = "0.8"
 jsonwebtoken = "8"
-dotenv = "0.15"
 
 serde_json = "1.0.75"
 serde = {version = "1.0.152", features = ["derive"]}
 mongodb = "2.3.1"
 bson = { version = "2", features = ["chrono-0_4"] } # Needed for using chrono datetime in doc
 chrono = "0.4" # Used for setting DateTimes
-rocket_cors = "0.5.2"
