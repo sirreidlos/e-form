@@ -143,13 +143,23 @@ pub async fn get_form_as_anon(id: String, db: &State<Database>) -> Custom<Value>
 
 #[post("/form", format = "json", data = "<data>")]
 pub async fn post_form(user_id: Auth, data: Json<FormData>, db: &State<Database>) -> Custom<Value> {
+    let mut questions = data.questions.clone();
+    for (i, question) in questions.clone().iter().enumerate() {
+        match question.kind {
+            QuestionType::TextAnswer | QuestionType::Date | QuestionType::Time => {
+                questions[i].options = None;
+            }
+            _ => (),
+        }
+    }
+
     let form = Form {
         _id: ObjectId::new().to_string(),
         owner: user_id.0,
         title: data.title.clone(),
         description: data.description.clone(),
         state: data.state.clone(),
-        questions: data.questions.clone(),
+        questions,
         created_at: Utc::now(),
     };
 
