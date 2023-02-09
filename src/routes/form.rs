@@ -175,7 +175,7 @@ pub async fn post_form(user_id: Auth, data: Json<FormData>, db: &State<Database>
             Custom(
                 Status::InternalServerError,
                 json!({
-                    "message": "An internal server error has occured."
+                    "message": "An internal server error has occurred."
                 }),
             )
         }
@@ -246,7 +246,7 @@ pub async fn put_form(
             Custom(
                 Status::InternalServerError,
                 json!({
-                    "message": "An internal server error has occured."
+                    "message": "An internal server error has occurred."
                 }),
             )
         }
@@ -292,7 +292,7 @@ pub async fn delete_form(id: String, user_id: Auth, db: &State<Database>) -> Cus
             Custom(
                 Status::InternalServerError,
                 json!({
-                    "message": "An internal server error has occured."
+                    "message": "An internal server error has occurred."
                 }),
             )
         }

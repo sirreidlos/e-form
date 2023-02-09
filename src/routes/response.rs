@@ -4,8 +4,8 @@ use bson::{
 };
 
 use chrono::{DateTime, Utc};
+use mongodb::bson::doc;
 use mongodb::Database;
-use mongodb::{bson::doc, Client};
 use mongodb::{bson::oid::ObjectId, Cursor};
 use rocket::tokio::select;
 use rocket::{
@@ -52,6 +52,7 @@ pub struct Response {
 pub struct Answer {
     number: u32,
     input: Option<String>,
+    selected_options: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -81,7 +82,7 @@ pub async fn find_response_by_id(
             Err(Custom(
                 Status::InternalServerError,
                 json!({
-                    "message": "An internal server error has occured."
+                    "message": "An internal server error has occurred."
                 }),
             ))
         }
@@ -201,7 +202,7 @@ pub async fn get_response(id: String, user_id: Auth, db: &State<Database>) -> Cu
             println!("{e} in get response responses");
             return Custom(
                 Status::NoContent,
-                json!({"message": "An error has occured."}),
+                json!({"message": "An error has occurred."}),
             );
         }
     };
@@ -249,7 +250,7 @@ pub async fn post_response(
 
         if question.kind == QuestionType::Checkboxes {
             if let Some(options) = &question.options {
-                if answer.input.is_none() {
+                if answer.selected_options.is_none() {
                     return Custom(
                         Status::UnprocessableEntity,
                         json!({
@@ -258,7 +259,7 @@ pub async fn post_response(
                     );
                 }
 
-                let input: Vec<&str> = answer.input.as_ref().unwrap().split('|').collect();
+                let input: &Vec<String> = answer.selected_options.as_ref().unwrap();
                 for i in input {
                     if !options.contains(&i.to_owned()) {
                         return Custom(
@@ -324,7 +325,7 @@ pub async fn post_response(
             println!("{e}");
             return Custom(
                 Status::InternalServerError,
-                json!({"message": "An internal server error has occured."}),
+                json!({"message": "An internal server error has occurred."}),
             );
         }
     };
@@ -390,7 +391,7 @@ pub async fn delete_response(id: String, user_id: Auth, db: &State<Database>) ->
             Custom(
                 Status::InternalServerError,
                 json!({
-                    "message": "An internal server error has occured."
+                    "message": "An internal server error has occurred."
                 }),
             )
         }

@@ -29,7 +29,7 @@ pub async fn find_form_by_id(id: &str, db: &State<Database>) -> Result<Form, Cus
             Err(Custom(
                 Status::InternalServerError,
                 json!({
-                    "message": "An internal server error has occured."
+                    "message": "An internal server error has occurred."
                 }),
             ))
         }
