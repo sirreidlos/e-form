@@ -66,6 +66,7 @@ pub async fn rocket() -> _ {
         .mount(
             "/",
             routes![
+                routes::form::get_all_owned_forms,
                 routes::form::get_form,
                 routes::form::get_form_as_anon,
                 routes::form::post_form,
@@ -86,6 +87,6 @@ pub async fn rocket() -> _ {
                 routes::response::delete_response,
             ],
         )
-        .mount("/s1", FileServer::from(relative!("static")))
-        .mount("/s2", FileServer::from(relative!("static2")))
+    // .mount("/s1", FileServer::from(relative!("static")))
+    // .mount("/s2", FileServer::from(relative!("static2")))
 }
