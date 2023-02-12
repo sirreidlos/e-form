@@ -13,7 +13,6 @@ use mongodb::Client;
 use mongodb::Database;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::figment::Figment;
-use rocket::fs::{relative, FileServer};
 use rocket::http::{ContentType, Header, Method, Status};
 use rocket::request::Request;
 use rocket::tokio::sync::broadcast::channel;

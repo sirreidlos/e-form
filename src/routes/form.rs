@@ -1,4 +1,4 @@
-use std::{fs::File, path::Path, str::FromStr};
+use std::str::FromStr;
 
 use bson::{
     serde_helpers::{deserialize_hex_string_from_object_id, serialize_hex_string_as_object_id},
@@ -9,13 +9,7 @@ use chrono::{DateTime, Utc};
 use mongodb::bson::doc;
 use mongodb::bson::oid::ObjectId;
 use mongodb::Database;
-use rocket::{
-    data::ToByteUnit,
-    http::{ContentType, Status},
-    response::status::Custom,
-    serde::json::Json,
-    Data, State,
-};
+use rocket::{http::Status, response::status::Custom, serde::json::Json, State};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -76,33 +70,6 @@ pub struct FormData {
     pub thumbnail_string: Option<String>,
     pub questions: Vec<Question>,
 }
-
-// async fn exhaust_cursor<'a, T>(mut cursor: mongodb::Cursor<T>) -> mongodb::error::Result<Vec<T>>
-// where
-//     T: Deserialize<'a>,
-// {
-//     let mut vec = vec![];
-
-//     while cursor.advance().await? {
-//         let current = cursor.deserialize_current()?;
-//         vec.push(current)
-//     }
-
-//     Ok(vec)
-// }
-
-// async fn exhaust_cursor<'a, T>(cursor: mongodb::Cursor<T>)
-// where
-//     T: Deserialize<'a>,
-// {
-// }
-
-// pub fn deserialize_current<'a>(&'a self) -> Result<T>
-//     where
-//         T: Deserialize<'a>,
-//     {
-//         bson::from_slice(self.current().as_bytes()).map_err(Error::from)
-//     }
 
 #[get("/forms")]
 pub async fn get_all_owned_forms(user_id: Auth, db: &State<Database>) -> Custom<Value> {
@@ -260,59 +227,6 @@ pub async fn post_form(user_id: Auth, data: Json<FormData>, db: &State<Database>
     }
 }
 
-// use rocket::fs::relative;
-
-// #[post("/thumbnail/<id>", data = "<data>")]
-// pub async fn thumbnail_upload(
-//     id: String,
-//     data: Data<'_>,
-//     user_id: Auth,
-//     db: &State<Database>,
-// ) -> Custom<Value> {
-//     let form: Form = match find_form_by_id(&id, db).await {
-//         Ok(form) => form,
-//         Err(e) => {
-//             return e;
-//         }
-//     };
-
-//     if form.owner != user_id.0 {
-//         return Custom(
-//             Status::Forbidden,
-//             json!({
-//                 "message": "You are not the owner of this form."
-//             }),
-//         );
-//     }
-
-//     let file_path = Path::new(relative!("/thumbnails")).join(format!("{}.png", id));
-//     // let mut f = match File::create(file_path) {
-//     //     Ok(f) => f,
-//     //     Err(e) => {
-//     //         eprintln!("{e:?}");
-//     //         return Custom(
-//     //             Status::InternalServerError,
-//     //             json!({
-//     //                 "message": "An internal server error has occurred."
-//     //             }),
-//     //         );
-//     //     }
-//     // };
-
-//     let stream = data.open(16.mebibytes());
-//     let file = stream.into_file(file_path).await.unwrap();
-
-//     Custom(
-//         Status::Ok,
-//         json!({
-//             "message": "Thumbnail uploaded."
-//         }),
-//     )
-// }
-
-// #[get("/thumbnail/<id>")]
-// pub async fn get_thumbnail(id: String) {}
-
 #[post("/form/<_>", rank = 2)]
 pub async fn post_form_as_anon() -> Custom<Value> {
     Custom(
@@ -346,8 +260,18 @@ pub async fn put_form(
         );
     }
 
+    let mut questions = data.questions.clone();
+    for (i, question) in questions.clone().iter().enumerate() {
+        match question.kind {
+            QuestionType::TextAnswer | QuestionType::Date | QuestionType::Time => {
+                questions[i].options = None;
+            }
+            _ => (),
+        }
+    }
+
     let state = bson::to_bson(&data.state).unwrap();
-    let questions = bson::to_bson(&data.questions).unwrap();
+    let questions = bson::to_bson(&questions).unwrap();
 
     println!("{:?}", &form._id);
 
@@ -455,7 +379,6 @@ mod test {
     use rocket::http::{ContentType, Header, Status};
     use rocket::local::asynchronous::Client;
     use serde_json::json;
-    // use serde_json::json;
 
     use crate::auth::generate_jwt;
     use crate::rocket;
