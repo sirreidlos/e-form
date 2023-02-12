@@ -155,7 +155,13 @@ pub async fn response_stream(
                             continue;
                         }
 
-                        msg
+                        json!({
+                            "_id": msg._id,
+                            "responder": msg.responder,
+                            "form": msg.form,
+                            "answers": msg.answers,
+                            "created_at": msg.created_at.to_rfc3339(),
+                    })
                     },
                     Err(RecvError::Closed) => break,
                     Err(RecvError::Lagged(_)) => continue,
