@@ -102,7 +102,6 @@ async fn find_multiple_responses_by_id(
 
     while cursor.advance().await? {
         let current = cursor.deserialize_current()?;
-        // println!("{:?}", current);
         responses.push(current)
     }
 
@@ -282,6 +281,239 @@ pub async fn post_response(
                 }
                 // let input: Vec<String> = input.iter().map(|s| s.to_owned()).collect();
             }
+            continue;
+        }
+
+        if question.kind == QuestionType::Date {
+            let input = answer.input.as_ref().unwrap();
+            let split: Vec<&str> = input.split('/').collect();
+
+            if split.len() != 3 {
+                return Custom(
+                    Status::UnprocessableEntity,
+                    json!({
+                        "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
+                                answer.number, input
+                            )
+                    }),
+                );
+            }
+
+            match split[0].parse::<u32>() {
+                Ok(_) => (),
+                Err(_) => {
+                    return Custom(
+                        Status::UnprocessableEntity,
+                        json!({
+                            "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
+                                answer.number, input
+                            )
+                        }),
+                    )
+                }
+            }
+
+            match split[1].parse::<u32>() {
+                Ok(m) => {
+                    let r = 1..=12;
+                    if !std::ops::RangeInclusive::contains(&r, &m) {
+                        return Custom(
+                            Status::UnprocessableEntity,
+                            json!({
+                                "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (mm accepts 01-12).",
+                                answer.number, input
+                            )
+                            }),
+                        );
+                    }
+                }
+                Err(_) => {
+                    return Custom(
+                        Status::UnprocessableEntity,
+                        json!({
+                            "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
+                                answer.number, input
+                            )
+                        }),
+                    );
+                }
+            }
+
+            match split[2].parse::<u32>() {
+                Ok(d) => {
+                    let r = 1..=31;
+                    if !std::ops::RangeInclusive::contains(&r, &d) {
+                        return Custom(
+                            Status::UnprocessableEntity,
+                            json!({
+                                "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (dd accepts 01-31).",
+                                answer.number, input
+                            )
+                            }),
+                        );
+                    }
+                }
+                Err(_) => {
+                    return Custom(
+                        Status::UnprocessableEntity,
+                        json!({
+                            "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
+                                answer.number, input
+                            )
+                        }),
+                    );
+                }
+            }
+
+            // if let Ok(y) = split[0].parse::<u32>() {
+            //     y
+            // } else {
+            //     return Custom(
+            //         Status::UnprocessableEntity,
+            //         json!({
+            //             "message":
+            //                 format!(
+            //                     "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
+            //                     answer.number, input
+            //                 )
+            //         }),
+            //     );
+            // };
+            // if let Ok(m) = split[1].parse::<u32>() {
+            //     if m > 12 {
+            //         return Custom(
+            //             Status::UnprocessableEntity,
+            //             json!({
+            //                 "message":
+            //                 format!(
+            //                     "Answer number {} input '{}' has invalid input (mm accepts 01-12).",
+            //                     answer.number, input
+            //                 )
+            //             }),
+            //         );
+            //     }
+            // } else {
+            //     return Custom(
+            //         Status::UnprocessableEntity,
+            //         json!({
+            //             "message":
+            //                 format!(
+            //                     "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
+            //                     answer.number, input
+            //                 )
+            //         }),
+            //     );
+            // };
+            // if let Ok(d) = split[2].parse::<u32>() {
+            //     if d > 31 {
+            //         return Custom(
+            //             Status::UnprocessableEntity,
+            //             json!({
+            //                 "message":
+            //                 format!(
+            //                     "Answer number {} input '{}' has invalid input (mm accepts 01-12).",
+            //                     answer.number, input
+            //                 )
+            //             }),
+            //         );
+            //     }
+            // } else {
+            //     return Custom(
+            //         Status::UnprocessableEntity,
+            //         json!({
+            //             "message":
+            //                 format!(
+            //                     "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
+            //                     answer.number, input
+            //                 )
+            //         }),
+            //     );
+            // };
+
+            continue;
+        }
+
+        if question.kind == QuestionType::Time {
+            let input = answer.input.as_ref().unwrap();
+            let split: Vec<&str> = input.split(':').collect();
+
+            if split.len() != 2 {
+                return Custom(
+                    Status::UnprocessableEntity,
+                    json!({
+                        "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (expected hh:mm).",
+                                answer.number, input
+                            )
+                    }),
+                );
+            }
+
+            if let Ok(h) = split[0].parse::<u32>() {
+                if h > 23 {
+                    return Custom(
+                        Status::UnprocessableEntity,
+                        json!({
+                            "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (hh accepts 00-23).",
+                                answer.number, input
+                            )
+                        }),
+                    );
+                }
+            } else {
+                return Custom(
+                    Status::UnprocessableEntity,
+                    json!({
+                        "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (expected hh:mm).",
+                                answer.number, input
+                            )
+                    }),
+                );
+            };
+
+            if let Ok(m) = split[1].parse::<u32>() {
+                if m > 59 {
+                    return Custom(
+                        Status::UnprocessableEntity,
+                        json!({
+                            "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (mm accepts 00-59).",
+                                answer.number, input
+                            )
+                        }),
+                    );
+                }
+            } else {
+                return Custom(
+                    Status::UnprocessableEntity,
+                    json!({
+                        "message":
+                            format!(
+                                "Answer number {} input '{}' has invalid input (expected hh:mm).",
+                                answer.number, input
+                            )
+                    }),
+                );
+            };
+
             continue;
         }
 

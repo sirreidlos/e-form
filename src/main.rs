@@ -1,5 +1,3 @@
-#![feature(is_some_and)]
-
 #[macro_use]
 extern crate rocket;
 
@@ -9,8 +7,12 @@ extern crate lazy_static;
 mod auth;
 mod routes;
 
+use std::time;
+use std::time::Duration;
+
 use mongodb::Client;
 use mongodb::Database;
+use rocket::fairing::AdHoc;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::figment::Figment;
 use rocket::http::{ContentType, Header, Method, Status};
@@ -86,6 +88,17 @@ pub async fn rocket() -> _ {
                 routes::response::delete_response,
             ],
         )
+    // .attach(AdHoc::on_liftoff("Shutdown", |rocket| {
+    //     Box::pin(async move {
+    //         let shutdown = rocket.shutdown();
+    //         rocket::tokio::spawn(async move {
+    //             rocket::tokio::time::sleep(rocket::tokio::time::Duration::from_secs(15)).await;
+
+    //             shutdown.notify();
+    //         });
+    //     })
+    // }))
+
     // .mount("/s1", FileServer::from(relative!("static")))
     // .mount("/s2", FileServer::from(relative!("static2")))
 }
