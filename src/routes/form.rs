@@ -341,10 +341,21 @@ pub async fn delete_form(id: String, user_id: Auth, db: &State<Database>) -> Cus
 
     match db
         .collection::<Document>("forms")
-        .delete_one(doc! {"_id": form._id}, None)
+        .delete_one(doc! {"_id": ObjectId::from_str(&id).unwrap()}, None)
         .await
     {
-        Ok(_) => Custom(Status::Ok, json!({"message": "Form deleted."})),
+        Ok(mongodb::results::DeleteResult {
+            deleted_count: i, ..
+        }) if i > 0 => {
+            // println!("{a:?}");
+            println!("{:?}", id);
+            Custom(Status::Ok, json!({"message": "Form deleted."}))
+        }
+        Ok(_) => {
+            // println!("{a:?}");
+            println!("{:?}", id);
+            Custom(Status::Ok, json!({"message": "Form not deleted."}))
+        }
         Err(e) => {
             println!("{e} in delete_one");
             Custom(

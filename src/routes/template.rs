@@ -17,24 +17,19 @@ use crate::auth::Auth;
 use crate::routes::find_form_by_id;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Form {
+pub struct Template {
     #[serde(
         serialize_with = "serialize_hex_string_as_object_id",
         deserialize_with = "deserialize_hex_string_from_object_id"
     )]
     pub _id: String,
-    #[serde(
-        serialize_with = "serialize_hex_string_as_object_id",
-        deserialize_with = "deserialize_hex_string_from_object_id"
-    )]
-    pub owner: String,
     pub title: String,
     pub description: String,
-    pub state: FormState,
+    // pub state: FormState,
     pub questions: Vec<Question>,
     pub thumbnail_string: Option<String>,
-    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
-    pub created_at: DateTime<Utc>,
+    // #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
+    // pub created_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -71,76 +66,84 @@ pub struct FormData {
     pub questions: Vec<Question>,
 }
 
-#[get("/form/<id>")]
-pub async fn get_form(id: String, user_id: Auth, db: &State<Database>) -> Custom<Value> {
-    let form: Form = match find_form_by_id(&id, db).await {
-        Ok(form) => form,
+pub async fn find_template_by_id(
+    id: &str,
+    db: &State<Database>,
+) -> Result<Template, Custom<Value>> {
+    let obj_id = crate::routes::object_id_from_string(id)?;
+    match db
+        .collection("templates")
+        .find_one(doc! {"_id": obj_id}, None)
+        .await
+    {
+        Ok(Some(form)) => Ok(form),
+        Ok(None) => Err(Custom(
+            Status::NotFound,
+            json!({
+                "message": "Template not found."
+            }),
+        )),
         Err(e) => {
-            return e;
+            println!("{e} in find_template_by_id");
+            Err(Custom(
+                Status::InternalServerError,
+                json!({
+                    "message": "An internal server error has occurred."
+                }),
+            ))
+        }
+    }
+}
+
+#[get("/templates")]
+pub async fn get_all_templates(db: &State<Database>) -> Custom<Value> {
+    let mut cursor = match db
+        .collection::<Template>("templates")
+        .find(doc! {}, None)
+        .await
+    {
+        Ok(cursor) => cursor,
+        Err(e) => {
+            eprintln!("{e}");
+            return Custom(
+                Status::InternalServerError,
+                json!({
+                    "message": "An internal server error has occured."
+                }),
+            );
         }
     };
 
-    if form.state == FormState::Private && form.owner != user_id.0 {
-        return Custom(
-            Status::Forbidden,
-            json!({
-                "message": "This form is private."
-            }),
-        );
+    let mut templates = vec![];
+
+    while cursor.advance().await.unwrap() {
+        let current = cursor.deserialize_current().unwrap();
+        templates.push(json!({
+            "_id": current._id,
+            "title": current.title,
+            "thumbnail_string": current.thumbnail_string
+        }))
     }
 
-    let status = {
-        if form.owner == user_id.0 {
-            String::from("owner")
-        } else {
-            String::from("responder")
-        }
-    };
-
-    Custom(
-        Status::Ok,
-        json!({
-            "_id": form._id,
-            "owner": form.owner,
-            "title": form.title,
-            "description": form.description,
-            "user_status": status,
-            "state": form.state,
-            "questions": form.questions,
-            "created_at": form.created_at.to_rfc3339(),
-        }),
-    )
+    Custom(Status::Ok, json!(templates))
 }
 
 #[get("/template/<id>")]
 pub async fn get_template(id: String, db: &State<Database>) -> Custom<Value> {
-    let form: Form = match find_form_by_id(&id, db).await {
-        Ok(form) => form,
+    let template: Template = match find_template_by_id(&id, db).await {
+        Ok(template) => template,
         Err(e) => {
             return e;
         }
     };
 
-    if form.state != FormState::Anonymous {
-        return Custom(
-            Status::Unauthorized,
-            json!({
-                "message": "This form requires you to be authenticated. Log in."
-            }),
-        );
-    }
-
     Custom(
         Status::Ok,
         json!({
-            "_id": form._id,
-            "owner": form.owner,
-            "title": form.title,
-            "description": form.description,
-            "user_status": String::from("responder"),
-            "state": form.state,
-            "questions": form.questions,
-            "created_at": form.created_at.to_rfc3339(),
+            "_id": template._id,
+            "title": template.title,
+            "description": template.description,
+            "questions": template.questions,
         }),
     )
 }

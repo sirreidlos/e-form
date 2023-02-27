@@ -88,6 +88,13 @@ pub async fn rocket() -> _ {
                 routes::response::delete_response,
             ],
         )
+        .mount(
+            "/",
+            routes![
+                routes::template::get_all_templates,
+                routes::template::get_template,
+            ],
+        )
     // .attach(AdHoc::on_liftoff("Shutdown", |rocket| {
     //     Box::pin(async move {
     //         let shutdown = rocket.shutdown();
