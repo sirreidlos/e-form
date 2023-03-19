@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bson::{
     serde_helpers::{deserialize_hex_string_from_object_id, serialize_hex_string_as_object_id},
     Document,
@@ -634,4 +636,94 @@ pub async fn delete_response(id: String, user_id: Auth, db: &State<Database>) ->
             )
         }
     }
+}
+
+#[get("/chart/<id>")]
+pub async fn response_chart(
+    id: String,
+    user_id: Auth,
+    db: &State<Database>,
+    queue: &State<Sender<Response>>,
+) -> Custom<Value> {
+    let form: Form = match find_form_by_id(&id, db).await {
+        Ok(form) => form,
+        Err(e) => {
+            return e;
+        }
+    };
+
+    if form.owner != user_id.0 {
+        return Custom(
+            Status::Forbidden,
+            json!({
+                "message": "You are not the owner of this form."
+            }),
+        );
+    }
+
+    let obj_id = object_id_from_string(&id).unwrap();
+    let responses = match find_multiple_responses_by_id(obj_id, db).await {
+        Ok(responses) => {
+            let mut responses_summary: HashMap<usize, HashMap<String, usize>> = HashMap::new();
+            for response in responses {
+                for answer in response.answers {
+                    if let Some(input) = answer.input {
+                        let index = (answer.number - 1) as usize;
+
+                        responses_summary
+                            .entry(index + 1)
+                            .and_modify(|map| {
+                                map.entry(input.clone())
+                                    .and_modify(|v| *v += 1)
+                                    .or_insert(1);
+                            })
+                            .or_insert(HashMap::from([(input, 1)]));
+
+                        continue;
+                    }
+
+                    if let Some(inputs) = answer.selected_options {
+                        let index = (answer.number - 1) as usize;
+
+                        for input in inputs {
+                            responses_summary
+                                .entry(index + 1)
+                                .and_modify(|map| {
+                                    map.entry(input.clone())
+                                        .and_modify(|v| *v += 1)
+                                        .or_insert(1);
+                                })
+                                .or_insert(HashMap::from([(input, 1)]));
+                        }
+
+                        continue;
+                    }
+                }
+            }
+
+            responses_summary
+        }
+        Err(e) => {
+            eprintln!(
+                "{:?} - {e:?}",
+                std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH)
+            );
+            return Custom(
+                Status::InternalServerError,
+                json!({
+                    "message": "An internal server error has occurred."
+                }),
+            );
+        }
+    };
+
+    Custom(Status::InternalServerError, json!(responses))
+}
+
+#[get("/chart/<_>", rank = 2)]
+pub async fn response_chart_as_anon() -> Custom<Value> {
+    Custom(
+        Status::Unauthorized,
+        json!({"message": "You are not logged in."}),
+    )
 }
