@@ -717,7 +717,7 @@ pub async fn response_chart(
         }
     };
 
-    Custom(Status::InternalServerError, json!(responses))
+    Custom(Status::Ok, json!(responses))
 }
 
 #[get("/chart/<_>", rank = 2)]
