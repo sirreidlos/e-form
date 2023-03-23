@@ -583,7 +583,7 @@ pub async fn post_response(
                 );
             }
             let _res = queue.send(response.unwrap());
-            Custom(Status::Ok, json!({"message": "Response sent."}))
+            Custom(Status::Created, json!({"message": "Response sent."}))
         }
         Err(e) => {
             println!("{e}");
