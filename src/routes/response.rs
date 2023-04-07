@@ -281,7 +281,6 @@ pub async fn post_response(
                         );
                     }
                 }
-                // let input: Vec<String> = input.iter().map(|s| s.to_owned()).collect();
             }
             continue;
         }
@@ -378,71 +377,6 @@ pub async fn post_response(
                     );
                 }
             }
-
-            // if let Ok(y) = split[0].parse::<u32>() {
-            //     y
-            // } else {
-            //     return Custom(
-            //         Status::UnprocessableEntity,
-            //         json!({
-            //             "message":
-            //                 format!(
-            //                     "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
-            //                     answer.number, input
-            //                 )
-            //         }),
-            //     );
-            // };
-            // if let Ok(m) = split[1].parse::<u32>() {
-            //     if m > 12 {
-            //         return Custom(
-            //             Status::UnprocessableEntity,
-            //             json!({
-            //                 "message":
-            //                 format!(
-            //                     "Answer number {} input '{}' has invalid input (mm accepts 01-12).",
-            //                     answer.number, input
-            //                 )
-            //             }),
-            //         );
-            //     }
-            // } else {
-            //     return Custom(
-            //         Status::UnprocessableEntity,
-            //         json!({
-            //             "message":
-            //                 format!(
-            //                     "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
-            //                     answer.number, input
-            //                 )
-            //         }),
-            //     );
-            // };
-            // if let Ok(d) = split[2].parse::<u32>() {
-            //     if d > 31 {
-            //         return Custom(
-            //             Status::UnprocessableEntity,
-            //             json!({
-            //                 "message":
-            //                 format!(
-            //                     "Answer number {} input '{}' has invalid input (mm accepts 01-12).",
-            //                     answer.number, input
-            //                 )
-            //             }),
-            //         );
-            //     }
-            // } else {
-            //     return Custom(
-            //         Status::UnprocessableEntity,
-            //         json!({
-            //             "message":
-            //                 format!(
-            //                     "Answer number {} input '{}' has invalid input (expected yyyy/mm/dd).",
-            //                     answer.number, input
-            //                 )
-            //         }),
-            //     );
-            // };
 
             continue;
         }
@@ -639,12 +573,7 @@ pub async fn delete_response(id: String, user_id: Auth, db: &State<Database>) ->
 }
 
 #[get("/chart/<id>")]
-pub async fn response_chart(
-    id: String,
-    user_id: Auth,
-    db: &State<Database>,
-    queue: &State<Sender<Response>>,
-) -> Custom<Value> {
+pub async fn response_chart(id: String, user_id: Auth, db: &State<Database>) -> Custom<Value> {
     let form: Form = match find_form_by_id(&id, db).await {
         Ok(form) => form,
         Err(e) => {

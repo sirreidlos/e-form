@@ -16,8 +16,6 @@ use serde_json::{json, Value};
 use crate::auth::Auth;
 use crate::routes::find_form_by_id;
 
-use super::object_id_from_string;
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Form {
     #[serde(
@@ -71,68 +69,6 @@ pub struct FormData {
     pub state: FormState,
     pub thumbnail_string: Option<String>,
     pub questions: Vec<Question>,
-}
-
-impl Form {
-    pub async fn get_form_by_id(db: &State<Database>, id: &str) -> Result<Form, Custom<Value>> {
-        let obj_id = object_id_from_string(id)?;
-        match db
-            .collection("forms")
-            .find_one(doc! {"_id": obj_id}, None)
-            .await
-        {
-            Ok(Some(form)) => Ok(form),
-            Ok(None) => Err(Custom(
-                Status::NotFound,
-                json!({
-                    "message": "Form not found."
-                }),
-            )),
-            Err(e) => {
-                println!("{e} in find_form_by_id");
-                Err(Custom(
-                    Status::InternalServerError,
-                    json!({
-                        "message": "An internal server error has occurred."
-                    }),
-                ))
-            }
-        }
-    }
-
-    pub async fn get_all_forms_with_filter(
-        db: &State<Database>,
-        filter: mongodb::bson::Document,
-        option: Option<mongodb::options::FindOptions>,
-    ) -> Result<Vec<Form>, Custom<Value>> {
-        let mut cursor = match db.collection::<Form>("forms").find(filter, option).await {
-            Ok(cursor) => cursor,
-            Err(e) => {
-                eprintln!("{e}");
-                return Err(Custom(
-                    Status::InternalServerError,
-                    json!({
-                        "message": "An internal server error has occurred."
-                    }),
-                ));
-            }
-        };
-
-        let mut forms = vec![];
-
-        while cursor.advance().await.unwrap() {
-            let current = cursor.deserialize_current().unwrap();
-            // forms.push(json!({
-            //     "_id": current._id,
-            //     "title": current.title,
-            //     "created_at": current.created_at.to_rfc3339(),
-            //     "thumbnail_string": current.thumbnail_string,
-            // }))
-            forms.push(current)
-        }
-
-        Ok(forms)
-    }
 }
 
 #[get("/forms")]
@@ -411,12 +347,10 @@ pub async fn delete_form(id: String, user_id: Auth, db: &State<Database>) -> Cus
         Ok(mongodb::results::DeleteResult {
             deleted_count: i, ..
         }) if i > 0 => {
-            // println!("{a:?}");
             println!("{:?}", id);
             Custom(Status::Ok, json!({"message": "Form deleted."}))
         }
         Ok(_) => {
-            // println!("{a:?}");
             println!("{:?}", id);
             Custom(Status::Ok, json!({"message": "Form not deleted."}))
         }
@@ -508,7 +442,6 @@ mod test {
 
         assert_eq!(response.status(), Status::Ok);
         println!("{:?}", response.body());
-        // assert!(cleanup("test@example.com").await.is_ok());
     }
 
     #[async_test]
@@ -530,7 +463,6 @@ mod test {
 
         assert_eq!(response.status(), Status::Forbidden);
         println!("{:?}", response.body());
-        // assert!(cleanup("test@example.com").await.is_ok());
     }
 
     #[async_test]
@@ -548,7 +480,6 @@ mod test {
 
         assert_eq!(response.status(), Status::Unauthorized);
         println!("{:?}", response.body());
-        // assert!(cleanup("test@example.com").await.is_ok());
     }
 
     #[async_test]
@@ -683,8 +614,6 @@ mod test {
 
         assert_eq!(response.status(), Status::Ok);
         println!("{:?}", response.body());
-
-        // assert!(cleanup("TEST FORM").await.is_ok());
     }
 
     #[async_test]
@@ -768,8 +697,6 @@ mod test {
 
         assert_eq!(response.status(), Status::Unauthorized);
         println!("{:?}", response.body());
-
-        // assert!(cleanup("TEST FORM").await.is_ok());
     }
 
     #[async_test]

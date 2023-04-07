@@ -8,8 +8,8 @@ use serde_json::{json, Value};
 
 pub mod form;
 pub mod response;
-pub mod user;
 pub mod template;
+pub mod user;
 
 pub async fn find_form_by_id(id: &str, db: &State<Database>) -> Result<Form, Custom<Value>> {
     let obj_id = object_id_from_string(id)?;

@@ -1,4 +1,5 @@
 [default]
 address = "127.255.255.1"
 port = 80
-secret_key = "VErLg+wCotiao+L6eebli7avEaXSN+Xhl0rId4Q3AYk="
+secret_key = "VErLg+wCotiao+L6eebli7avEaXSN+Xhl0rId4Q3AYk=" # ! TODO Change this.
+database = "mongodb://localhost:27017"

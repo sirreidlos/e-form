@@ -7,12 +7,9 @@ extern crate lazy_static;
 mod auth;
 mod routes;
 
-use std::time;
-use std::time::Duration;
-
 use mongodb::Client;
 use mongodb::Database;
-use rocket::fairing::AdHoc;
+
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::figment::Figment;
 use rocket::http::{ContentType, Header, Method, Status};
@@ -51,18 +48,21 @@ impl Fairing for CORS {
 
 #[launch]
 pub async fn rocket() -> _ {
-    let mongo_db = match Client::with_uri_str("mongodb://localhost:27017/e-form").await {
+    let figment = Config::figment();
+    let database_uri: String = figment
+        .extract_inner("database")
+        .expect("database uri be provided in Rocket.toml");
+
+    let mongo_db = match Client::with_uri_str(database_uri).await {
         Ok(client) => client.database("e-form"),
         Err(e) => panic!("{e}"),
     };
-
-    let config = Config::figment();
 
     rocket::build()
         .attach(CORS)
         .manage(channel::<routes::response::Response>(1024).0)
         .manage::<Database>(mongo_db)
-        .manage::<Figment>(config)
+        .manage::<Figment>(figment)
         .mount("/", routes![routes::user::login, routes::user::register])
         .mount(
             "/",
@@ -97,17 +97,4 @@ pub async fn rocket() -> _ {
                 routes::template::get_template,
             ],
         )
-    // .attach(AdHoc::on_liftoff("Shutdown", |rocket| {
-    //     Box::pin(async move {
-    //         let shutdown = rocket.shutdown();
-    //         rocket::tokio::spawn(async move {
-    //             rocket::tokio::time::sleep(rocket::tokio::time::Duration::from_secs(15)).await;
-
-    //             shutdown.notify();
-    //         });
-    //     })
-    // }))
-
-    // .mount("/s1", FileServer::from(relative!("static")))
-    // .mount("/s2", FileServer::from(relative!("static2")))
 }

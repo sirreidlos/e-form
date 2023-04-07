@@ -1,20 +1,13 @@
-use std::str::FromStr;
-
-use bson::{
-    serde_helpers::{deserialize_hex_string_from_object_id, serialize_hex_string_as_object_id},
-    Document,
+use bson::serde_helpers::{
+    deserialize_hex_string_from_object_id, serialize_hex_string_as_object_id,
 };
 
-use chrono::{DateTime, Utc};
 use mongodb::bson::doc;
-use mongodb::bson::oid::ObjectId;
+
 use mongodb::Database;
-use rocket::{http::Status, response::status::Custom, serde::json::Json, State};
+use rocket::{http::Status, response::status::Custom, State};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-
-use crate::auth::Auth;
-use crate::routes::find_form_by_id;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Template {
@@ -25,11 +18,8 @@ pub struct Template {
     pub _id: String,
     pub title: String,
     pub description: String,
-    // pub state: FormState,
     pub questions: Vec<Question>,
     pub thumbnail_string: Option<String>,
-    // #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
-    // pub created_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
